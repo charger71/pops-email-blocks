@@ -49,7 +49,7 @@ export const printingOf = (v) => {
 const withoutPrinting = (v) => String(v ?? '').replace(new RegExp(PRINT_RE.source, 'ig'), ' ').replace(/\s+/g, ' ').trim();
 const MAIN_COVER = (v) => {
   const r = withoutPrinting(v);
-  return !r || /^(?:(?:cvr|cover)\s+a\b|a$|a\s+main\b)/i.test(r); // "CVR A …", "Cover A", a bare "A", Boom's "A Main (Dressed, Wong)"
+  return !r || /^[\s(]*(?:facsimile(?:\s+edition)?\s+)?(?:(?:cvr|cover)\s+a\b|a$|a\s+main\b)/i.test(r); // "CVR A …", "(CVR A) (Artist)", "FACSIMILE EDITION CVR A …", "Cover A", a bare "A", Boom's "A Main (Dressed, Wong)"
 };
 const norm = (s) => String(s ?? '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
 const sameTitle = (s) => norm(String(s ?? '').replace(/\(\d{4}\)/g, '')); // the catalog's "GARGOYLES (2026)" is the report's "Gargoyles"
@@ -113,14 +113,23 @@ async function emailCover(url) {
 
 /** The best open pre-order for each name: main cover, soonest FOC (or the --foc one). Names that match nothing come back in `missing`. */
 export function matchTitles(names, rows, foc, statuses = ['pre_order']) {
-  const open = rows.filter((r) => (!statuses || statuses.includes(r.status)) && MAIN_COVER(r.variant) && (!foc || r.foc_date === foc));
+  const inScope = rows.filter((r) => (!statuses || statuses.includes(r.status)) && (!foc || r.foc_date === foc));
+  const mains = inScope.filter((r) => MAIN_COVER(r.variant));
   const items = [];
   const missing = [];
+  const fitsIn = (pool, want) => pool.filter((r) => sameTitle(r.title) === want.title && (want.issue == null || issueNo(r.issue_number) === want.issue));
+  // Letter order, so "C Cenobite Bag Variant" loses to "(CVR B)"; unlettered covers go last.
+  const letter = (r) => String(r.variant ?? '').match(/(?:^|[\s(])(?:cvr|cover|variant)?\s*([a-z])\b/i)?.[1]?.toLowerCase() ?? '~';
   for (const name of names) {
     const want = parseName(name);
-    const fits = open.filter((r) => sameTitle(r.title) === want.title && (want.issue == null || issueNo(r.issue_number) === want.issue));
+    const fits = fitsIn(mains, want);
     // A name that says "(4th printing)" wants exactly that printing; a plain name wants the first printing, else whatever is open.
-    const hit = want.printing ? fits.find((r) => printingOf(r.variant) === want.printing) : (fits.find((r) => !printingOf(r.variant)) ?? fits[0]);
+    let hit = want.printing ? fits.find((r) => printingOf(r.variant) === want.printing) : (fits.find((r) => !printingOf(r.variant)) ?? fits[0]);
+    if (!hit) {
+      // No main cover is listed (a printing that only has a variant cover, or a book whose A cover isn't in the catalog): use the next best.
+      const any = fitsIn(inScope, want).sort((a, b) => letter(a).localeCompare(letter(b)));
+      hit = want.printing ? any.find((r) => printingOf(r.variant) === want.printing) : (any.find((r) => !printingOf(r.variant)) ?? any[0]);
+    }
     if (hit) items.push(hit);
     else missing.push(name);
   }

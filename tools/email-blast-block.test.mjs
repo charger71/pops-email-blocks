@@ -161,4 +161,11 @@ for (const out of [plain, plainGrid]) {
 assert.match(plain, /font-size:22px;line-height:1\.2;font-weight:bold;/);
 assert.match(plain, /class="pw-fcol pw-fcover" style="background-color:transparent !important;display:inline-block;vertical-align:top;width:40%;/); // layout stays
 assert.equal(unstyle('<td bgcolor="#fff" style="background-color:#fff !important;color:#000 !important;padding:1px;">'), '<td style="background-color:transparent !important;padding:1px;">');
+// Main-cover labels seen in the catalog, and books with no main cover listed
+const lab = (variant, extra = {}) => ({ id: 1, title: 'X', issue_number: '1', status: 'pre_order', foc_date: '2026-11-23', variant, ...extra });
+assert.equal(matchTitles(['X #1'], [lab('FACSIMILE EDITION CVR B DAVE GIBBONS CARD STOCK VAR', { id: 2 }), lab('FACSIMILE EDITION CVR A DAVE GIBBONS')]).items[0].id, 1);
+assert.equal(matchTitles(['X #1'], [lab('(CVR A) (Drew Zucker)')]).items.length, 1);
+assert.equal(matchTitles(['X #1'], [lab('(CVR B) (Fegredo)', { id: 2 }), lab('(CVR D) (Oz)', { id: 3 }), lab('(CVR A) (Zucker)')]).items[0].id, 1);
+assert.equal(matchTitles(['X #1 (2nd printing)'], [lab('STEFANO CASELLI 2ND PRINTING VARIANT', { id: 5 }), lab(null)]).items[0].id, 5); // printing with only a variant cover
+assert.equal(matchTitles(['X #1'], [lab('C Cenobite Bag Variant (Full Art)', { id: 7 }), lab('B Variant (Fuso)', { id: 6 })]).items[0].id, 6); // no main cover: lowest letter
 console.log('email-blast-block: ok');
