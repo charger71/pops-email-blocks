@@ -1,0 +1,7 @@
+{
+  "name": "pops-email-blocks",
+  "private": true,
+  "type": "module",
+  "description": "Email-blast HTML blocks for Pop's Comics (EmailOctopus), built from the Pullwise catalog.",
+  "scripts": { "test": "node tools/email-blast-block.test.mjs" }
+}
